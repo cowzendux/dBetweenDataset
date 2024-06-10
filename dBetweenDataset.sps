@@ -1,3 +1,4 @@
+* Encoding: UTF-8.
 * Calculate between-groups d statistic
 * Analyses by Jamie DeCoster
 
@@ -36,78 +37,72 @@ into a list by including brackets, even though there is only one group variable
 of interest. The split file variable was excluded, so the analyses will be performed
 on the full data set.
 
-*******
-* Version History
-*******
-* 2013-04-04 Created
-* 2013-04-05 Finished making the program work with lists
-* 2013-04-05a Added the optional split variable
-* 2013-04-07 Made the program work even if there are empty cells
-* 2013-04-08 Added overall effect sizes to table of effect sizes by split variable
-* 2013-04-08a Performed additional correction to make function work with
-    empty cells
-* 2013-04-26 Added Ns to final table
-
 set printback=off.
-begin program python.
+begin program python3.
 import spss, spssaux, spssdata, math
 
 def getVariableIndex(variable):
-   	for t in range(spss.GetVariableCount()):
-      if (variable.upper() == spss.GetVariableName(t).upper()):
-         return(t)
+    for t in range(spss.GetVariableCount()):
+        if variable.upper() == spss.GetVariableName(t).upper():
+            return t
 
 def descriptive(variable, stat):
-# Valid values for stat are MEAN STDDEV MINIMUM MAXIMUM
-# SEMEAN VARIANCE SKEWNESS SESKEW RANGE
-# MODE KURTOSIS SEKURT MEDIAN SUM VALID MISSING
-# VALID returns the number of cases with valid values, and MISSING returns
-# the number of cases with missing values
+    # Valid values for stat are MEAN STDDEV MINIMUM MAXIMUM
+    # SEMEAN VARIANCE SKEWNESS SESKEW RANGE
+    # MODE KURTOSIS SEKURT MEDIAN SUM VALID MISSING
+    # VALID returns the number of cases with valid values, and MISSING returns
+    # the number of cases with missing values
 
- if (stat.upper() == "VALID"):
-   cmd = "FREQUENCIES VARIABLES="+variable+"\n\
-  /FORMAT=NOTABLE\n\
-  /ORDER=ANALYSIS."
-	  handle,failcode=spssaux.CreateXMLOutput(
-		cmd,
-		omsid="Frequencies",
-		subtype="Statistics",
-		visible=False)
-	  result=spssaux.GetValuesFromXMLWorkspace(
-		handle,
-		tableSubtype="Statistics",
-		cellAttrib="text")
-   return (result[0])
- elif (stat.upper() == "MISSING"):
-   cmd = "FREQUENCIES VARIABLES="+variable+"\n\
-  /FORMAT=NOTABLE\n\
-  /ORDER=ANALYSIS."
-	  handle,failcode=spssaux.CreateXMLOutput(
-		cmd,
-		omsid="Frequencies",
-		subtype="Statistics",
-		visible=False)
-	  result=spssaux.GetValuesFromXMLWorkspace(
-		handle,
-		tableSubtype="Statistics",
-		cellAttrib="text")
-   return (result[1])
- else:
-  	cmd = "FREQUENCIES VARIABLES="+variable+"\n\
-  /FORMAT=NOTABLE\n\
-  /STATISTICS="+stat+"\n\
-  /ORDER=ANALYSIS."
-	  handle,failcode=spssaux.CreateXMLOutput(
-		cmd,
-		omsid="Frequencies",
-		subtype="Statistics",
-		visible=False)
-	  result=spssaux.GetValuesFromXMLWorkspace(
-		handle,
-		tableSubtype="Statistics",
-		cellAttrib="text")
-   if (float(result[0]) <> 0 and len(result) > 2):
-    return (result[2])
+    if stat.upper() == "VALID":
+        cmd = "FREQUENCIES VARIABLES=" + variable + "\n\
+        /FORMAT=NOTABLE\n\
+        /ORDER=ANALYSIS."
+        handle, failcode = spssaux.CreateXMLOutput(
+            cmd,
+            omsid="Frequencies",
+            subtype="Statistics",
+            visible=False
+        )
+        result = spssaux.GetValuesFromXMLWorkspace(
+            handle,
+            tableSubtype="Statistics",
+            cellAttrib="text"
+        )
+        return result[0]
+    elif stat.upper() == "MISSING":
+        cmd = "FREQUENCIES VARIABLES=" + variable + "\n\
+        /FORMAT=NOTABLE\n\
+        /ORDER=ANALYSIS."
+        handle, failcode = spssaux.CreateXMLOutput(
+            cmd,
+            omsid="Frequencies",
+            subtype="Statistics",
+            visible=False
+        )
+        result = spssaux.GetValuesFromXMLWorkspace(
+            handle,
+            tableSubtype="Statistics",
+            cellAttrib="text"
+        )
+        return result[1]
+    else:
+        cmd = "FREQUENCIES VARIABLES=" + variable + "\n\
+        /FORMAT=NOTABLE\n\
+        /STATISTICS=" + stat + "\n\
+        /ORDER=ANALYSIS."
+        handle, failcode = spssaux.CreateXMLOutput(
+            cmd,
+            omsid="Frequencies",
+            subtype="Statistics",
+            visible=False
+        )
+        result = spssaux.GetValuesFromXMLWorkspace(
+            handle,
+            tableSubtype="Statistics",
+            cellAttrib="text"
+        )
+        if float(result[0]) != 0 and len(result) > 2:
+            return result[2]
 
 def getLevels(variable):
     submitstring = """use all.
@@ -116,30 +111,33 @@ SET Tnumbers=values.
 OMS SELECT TABLES
 /IF COMMANDs=['Frequencies'] SUBTYPES=['Frequencies']
 /DESTINATION FORMAT=OXML XMLWORKSPACE='freq_table'.
-    FREQUENCIES VARIABLES=%s.
-    OMSEND.
-SET Tnumbers=Labels.""" %(variable)
+FREQUENCIES VARIABLES=%s.
+OMSEND.
+SET Tnumbers=Labels.""" % (variable)
     spss.Submit(submitstring)
- 
-    handle='freq_table'
-    context="/outputTree"
-#get rows that are totals by looking for varName attribute
-#use the group element to skip split file category text attributes
-    xpath="//group/category[@varName]/@text"
-    values=spss.EvaluateXPath(handle,context,xpath)
 
-# If the original variable was numeric, convert the list to numbers
+    handle = 'freq_table'
+    context = "/outputTree"
+    # Get rows that are totals by looking for varName attribute
+    # Use the group element to skip split file category text attributes
+    xpath = "//group/category[@varName]/@text"
+    values = spss.EvaluateXPath(handle, context, xpath)
 
-    varnum=getVariableIndex(variable)
+    # If the original variable was numeric, convert the list to numbers
+    varnum = getVariableIndex(variable)
     values2 = []
-    if (spss.GetVariableType(varnum) == 0):
-      for t in range(len(values)):
-         values2.append(int(float(values[t])))
+    if spss.GetVariableType(varnum) == 0:
+        for t in range(len(values)):
+            values2.append(int(float(values[t])))
     else:
-      for t in range(len(values)):
-         values2.append("'" + values[t] + "'")
+        for t in range(len(values)):
+            values2.append("'" + values[t] + "'")
     spss.DeleteXPathHandle(handle)
     return values2
+
+import math
+import spss
+import spssaux
 
 def dBetweenDataset(outcomeList, groupList, splitvar="None"):
     if splitvar == "None":
@@ -156,73 +154,79 @@ def dBetweenDataset(outcomeList, groupList, splitvar="None"):
                     submitstring = """USE ALL.
 COMPUTE filter_$=(%s=%s).
 FILTER BY filter_$.
-EXECUTE.""" %(group, level)
+EXECUTE.""" % (group, level)
                     spss.Submit(submitstring)
 
                     namelist.append(str(level))
-                    if (descriptive(outcome, "MEAN") == None):
-                       m = None
+                    if descriptive(outcome, "MEAN") is None:
+                        m = None
                     else:
-                       m = float(descriptive(outcome, "MEAN"))
+                        m = float(descriptive(outcome, "MEAN"))
                     meanlist.append(m)
-                    if (descriptive(outcome, "STDDEV") == None):
-                       s = None
+                    if descriptive(outcome, "STDDEV") is None:
+                        s = None
                     else:
-                       s = float(descriptive(outcome, "STDDEV"))
+                        s = float(descriptive(outcome, "STDDEV"))
                     sdlist.append(s)
-                    if (descriptive(outcome, "VALID") == None):
-                       n = None
+                    if descriptive(outcome, "VALID") is None:
+                        n = None
                     else:
-                       n = float(descriptive(outcome, "VALID"))
+                        n = float(descriptive(outcome, "VALID"))
                     nlist.append(n)
-                    if (n == None or s == None):
-                       w = None
+                    if n is None or s is None:
+                        w = None
                     else:
-                       w = w + ((n-1)*(s**2))
+                        w = (n - 1) * (s ** 2)
                     wlist.append(w)
 
-                if (wlist[0] == None or wlist[1] == None):
-                   sp = None
+                if wlist[0] is None or wlist[1] is None:
+                    sp = None
                 else:
-                   sp = math.sqrt((wlist[0]+wlist[1])/(nlist[0]+nlist[1]))
-                if (sp == None or meanlist[0] == None or meanlist[1] == None):
-                   d = None
+                    sp = math.sqrt((wlist[0] + wlist[1]) / (nlist[0] + nlist[1]))
+                if sp is None or meanlist[0] is None or meanlist[1] is None:
+                    d = None
                 else:
-                   d = (meanlist[0] - meanlist[1]) / sp
+                    d = (meanlist[0] - meanlist[1]) / sp
+                    dse = math.sqrt((nlist[0] + nlist[1]) / (nlist[0] * nlist[1]) + (d ** 2) / (2 * (nlist[0] + nlist[1])))
+                    d95lower = d - 1.96 * dse
+                    d95upper = d + 1.96 * dse
                 dt.append([group, outcome, namelist[0], namelist[1], nlist[0], nlist[1],
-                    meanlist[0], meanlist[1], sdlist[0], sdlist[1], sp, d])
+                           meanlist[0], meanlist[1], sdlist[0], sdlist[1], sp, d, dse, d95lower, d95upper])
 
         spss.Submit("use all.")
-    
-########
-# Saving data set
-########
+
+        ########
+        # Saving data set
+        ########
 
         spss.StartDataStep()
         datasetObj = spss.Dataset(name=None)
         dsetname = datasetObj.name
-        datasetObj.varlist.append('GroupVar',25)
-        datasetObj.varlist.append('Outcome',25)
-        datasetObj.varlist.append('Label1',25)
-        datasetObj.varlist.append('Label2',25)
-        datasetObj.varlist.append('N1',0)
-        datasetObj.varlist.append('N2',0)
-        datasetObj.varlist.append('Mean1',0)
-        datasetObj.varlist.append('Mean2',0)
-        datasetObj.varlist.append('S1',0)
-        datasetObj.varlist.append('S2',0)
-        datasetObj.varlist.append('Spooled',0)
-        datasetObj.varlist.append('d',0)
+        datasetObj.varlist.append('GroupVar', 25)
+        datasetObj.varlist.append('Outcome', 25)
+        datasetObj.varlist.append('Label1', 25)
+        datasetObj.varlist.append('Label2', 25)
+        datasetObj.varlist.append('N1', 0)
+        datasetObj.varlist.append('N2', 0)
+        datasetObj.varlist.append('Mean1', 0)
+        datasetObj.varlist.append('Mean2', 0)
+        datasetObj.varlist.append('S1', 0)
+        datasetObj.varlist.append('S2', 0)
+        datasetObj.varlist.append('Spooled', 0)
+        datasetObj.varlist.append('d', 0)
+        datasetObj.varlist.append('dse', 0)
+        datasetObj.varlist.append('d95lower', 0)
+        datasetObj.varlist.append('d95upper', 0)
 
         for line in dt:
-           datasetObj.cases.append(line)
+            datasetObj.cases.append(line)
         spss.EndDataStep()
 
         submitstring = """dataset activate %s.
-dataset name dBetween.""" %(dsetname)
+dataset name dBetween.""" % (dsetname)
         spss.Submit(submitstring)
 
-    else: # is a split variable
+    else:  # is a split variable
         dt = []
         slevels = getLevels(splitvar)
         for sl in slevels:
@@ -238,46 +242,49 @@ dataset name dBetween.""" %(dsetname)
                         submitstring = """USE ALL.
 COMPUTE filter_$=(%s=%s and %s=%s).
 FILTER BY filter_$.
-EXECUTE.""" %(splitvar, sl, group, level)
+EXECUTE.""" % (splitvar, sl, group, level)
                         spss.Submit(submitstring)
 
                         namelist.append(str(level))
-                        if (descriptive(outcome, "MEAN") == None):
+                        if descriptive(outcome, "MEAN") is None:
                             m = None
                         else:
                             m = float(descriptive(outcome, "MEAN"))
                         meanlist.append(m)
-                        if (descriptive(outcome, "STDDEV") == None):
+                        if descriptive(outcome, "STDDEV") is None:
                             s = None
                         else:
                             s = float(descriptive(outcome, "STDDEV"))
                         sdlist.append(s)
-                        if (descriptive(outcome, "VALID") == None):
+                        if descriptive(outcome, "VALID") is None:
                             n = None
                         else:
                             n = float(descriptive(outcome, "VALID"))
                         nlist.append(n)
-                        if (n == None or s == None):
+                        if n is None or s is None:
                             w = None
                         else:
-                            w = ((n-1)*(s**2))
+                            w = (n - 1) * (s ** 2)
                         wlist.append(w)
 
-                    if (wlist[0] == None or wlist[1] == None):
+                    if wlist[0] is None or wlist[1] is None:
                         sp = None
                     else:
-                        sp = math.sqrt((wlist[0] + wlist[1])/(nlist[0]+nlist[1]))
-                    if (sp == None or meanlist[0] == None or meanlist[1] == None):
+                        sp = math.sqrt((wlist[0] + wlist[1]) / (nlist[0] + nlist[1]))
+                    if sp is None or meanlist[0] is None or meanlist[1] is None:
                         d = None
                     else:
                         d = (meanlist[0] - meanlist[1]) / sp
+                        dse = math.sqrt((nlist[0] + nlist[1]) / (nlist[0] * nlist[1]) + (d ** 2) / (2 * (nlist[0] + nlist[1])))
+                        d95lower = d - 1.96 * dse
+                        d95upper = d + 1.96 * dse
                     dt.append([str(sl), group, outcome, namelist[0], namelist[1],
-                    nlist[0], nlist[1],
-                    meanlist[0], meanlist[1], sdlist[0], sdlist[1], sp, d])
+                               nlist[0], nlist[1],
+                               meanlist[0], meanlist[1], sdlist[0], sdlist[1], sp, d, dse, d95lower, d95upper])
 
         spss.Submit("use all.")
 
-# Add overall statistics
+        # Add overall statistics
 
         for group in groupList:
             glevels = getLevels(group)
@@ -291,74 +298,93 @@ EXECUTE.""" %(splitvar, sl, group, level)
                     submitstring = """USE ALL.
 COMPUTE filter_$=(%s=%s).
 FILTER BY filter_$.
-EXECUTE.""" %(group, level)
+EXECUTE.""" % (group, level)
                     spss.Submit(submitstring)
 
                     namelist.append(str(level))
-                    if (descriptive(outcome, "MEAN") == None):
-                       m = None
+                    if descriptive(outcome, "MEAN") is None:
+                        m = None
                     else:
-                       m = float(descriptive(outcome, "MEAN"))
+                        m = float(descriptive(outcome, "MEAN"))
                     meanlist.append(m)
-                    if (descriptive(outcome, "STDDEV") == None):
-                       s = None
+                    if descriptive(outcome, "STDDEV") is None:
+                        s = None
                     else:
-                       s = float(descriptive(outcome, "STDDEV"))
+                        s = float(descriptive(outcome, "STDDEV"))
                     sdlist.append(s)
-                    if (descriptive(outcome, "VALID") == None):
-                       n = None
+                    if descriptive(outcome, "VALID") is None:
+                        n = None
                     else:
-                       n = float(descriptive(outcome, "VALID"))
+                        n = float(descriptive(outcome, "VALID"))
                     nlist.append(n)
-                    if (n == None or s == None):
-                       w = None
+                    if n is None or s is None:
+                        w = None
                     else:
-                       w = ((n-1)*(s**2))
+                        w = (n - 1) * (s ** 2)
                     wlist.append(w)
 
-                if (wlist[0] == None or wlist[1] == None):
-                   sp = None
+                if wlist[0] is None or wlist[1] is None:
+                    sp = None
                 else:
-                   sp = math.sqrt((wlist[0] + wlist[1])/(nlist[0]+nlist[1]))
-                if (sp == None or meanlist[0] == None or meanlist[1] == None):
-                   d = None
+                    sp = math.sqrt((wlist[0] + wlist[1]) / (nlist[0] + nlist[1]))
+                if sp is None or meanlist[0] is None or meanlist[1] is None:
+                    d = None
                 else:
-                   d = (meanlist[0] - meanlist[1]) / sp
-                dt.append(["Overall", group, outcome, namelist[0], namelist[1], 
-                    nlist[0], nlist[1],
-                    meanlist[0], meanlist[1], sdlist[0], sdlist[1], sp, d])
+                    d = (meanlist[0] - meanlist[1]) / sp
+                    dse = math.sqrt((nlist[0] + nlist[1]) / (nlist[0] * nlist[1]) + (d ** 2) / (2 * (nlist[0] + nlist[1])))
+                    d95lower = d - 1.96 * dse
+                    d95upper = d + 1.96 * dse
+                dt.append(["Overall", group, outcome, namelist[0], namelist[1],
+                           nlist[0], nlist[1],
+                           meanlist[0], meanlist[1], sdlist[0], sdlist[1], sp, d, dse, d95lower, d95upper])
 
         spss.Submit("use all.")
-    
-########
-# Saving data set
-########
+
+        ########
+        # Saving data set
+        ########
 
         spss.StartDataStep()
         datasetObj = spss.Dataset(name=None)
         dsetname = datasetObj.name
         datasetObj.varlist.append(splitvar, 25)
-        datasetObj.varlist.append('GroupVar',25)
-        datasetObj.varlist.append('Outcome',25)
-        datasetObj.varlist.append('Label1',25)
-        datasetObj.varlist.append('Label2',25)
-        datasetObj.varlist.append('N1',0)
-        datasetObj.varlist.append('N2',0)
-        datasetObj.varlist.append('Mean1',0)
-        datasetObj.varlist.append('Mean2',0)
-        datasetObj.varlist.append('S1',0)
-        datasetObj.varlist.append('S2',0)
-        datasetObj.varlist.append('Spooled',0)
-        datasetObj.varlist.append('d',0)
+        datasetObj.varlist.append('GroupVar', 25)
+        datasetObj.varlist.append('Outcome', 25)
+        datasetObj.varlist.append('Label1', 25)
+        datasetObj.varlist.append('Label2', 25)
+        datasetObj.varlist.append('N1', 0)
+        datasetObj.varlist.append('N2', 0)
+        datasetObj.varlist.append('Mean1', 0)
+        datasetObj.varlist.append('Mean2', 0)
+        datasetObj.varlist.append('S1', 0)
+        datasetObj.varlist.append('S2', 0)
+        datasetObj.varlist.append('Spooled', 0)
+        datasetObj.varlist.append('d', 0)
+        datasetObj.varlist.append('dse', 0)
+        datasetObj.varlist.append('d95lower', 0)
+        datasetObj.varlist.append('d95upper', 0)
 
         for line in dt:
-           datasetObj.cases.append(line)
+            datasetObj.cases.append(line)
         spss.EndDataStep()
 
         submitstring = """dataset activate %s.
-dataset name dBetween.""" %(dsetname)
+dataset name dBetween.""" % (dsetname)
         spss.Submit(submitstring)
-
-end program python.
+end program python3.
 set printback=on.
 
+*******
+* Version History
+*******
+* 2013-04-04 Created
+* 2013-04-05 Finished making the program work with lists
+* 2013-04-05a Added the optional split variable
+* 2013-04-07 Made the program work even if there are empty cells
+* 2013-04-08 Added overall effect sizes to table of effect sizes by split variable
+* 2013-04-08a Performed additional correction to make function work with
+    empty cells
+* 2013-04-26 Added Ns to final table
+* 2021-03-08 Corrected error in calculating w
+* 2021-03-09 Added SE and CI
+* 2024-05-29 Converted to Python 3
